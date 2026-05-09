@@ -12,8 +12,8 @@ import { getSettings } from '../config/settings';
  * file brings the existing panel to the foreground instead of opening a
  * second one.
  */
-export class PanePanel {
-  private static panels = new Map<string, PanePanel>();
+export class GlancePanel {
+  private static panels = new Map<string, GlancePanel>();
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _fileUri: vscode.Uri;
@@ -54,9 +54,9 @@ export class PanePanel {
   static openOrReveal(
     fileUri: vscode.Uri,
     extensionUri: vscode.Uri,
-  ): PanePanel {
+  ): GlancePanel {
     const key = fileUri.toString();
-    const existing = PanePanel.panels.get(key);
+    const existing = GlancePanel.panels.get(key);
     if (existing) {
       existing._panel.reveal(vscode.ViewColumn.Beside);
       return existing;
@@ -64,8 +64,8 @@ export class PanePanel {
 
     const fileName = fileUri.path.split('/').pop() ?? 'Preview';
     const panel = vscode.window.createWebviewPanel(
-      'panePreview',
-      `Pane — ${fileName}`,
+      'glancePreview',
+      `Glance — ${fileName}`,
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
@@ -74,22 +74,22 @@ export class PanePanel {
       },
     );
 
-    const instance = new PanePanel(panel, fileUri, extensionUri);
-    PanePanel.panels.set(key, instance);
+    const instance = new GlancePanel(panel, fileUri, extensionUri);
+    GlancePanel.panels.set(key, instance);
     return instance;
   }
 
   static closeForFile(fileUri: vscode.Uri): void {
-    PanePanel.panels.get(fileUri.toString())?.dispose();
+    GlancePanel.panels.get(fileUri.toString())?.dispose();
   }
 
   static disposeAll(): void {
-    PanePanel.panels.forEach((p) => p.dispose());
-    PanePanel.panels.clear();
+    GlancePanel.panels.forEach((p) => p.dispose());
+    GlancePanel.panels.clear();
   }
 
   dispose(): void {
-    PanePanel.panels.delete(this._fileUri.toString());
+    GlancePanel.panels.delete(this._fileUri.toString());
     this._watcher?.dispose();
     this._panel.dispose();
     this._disposables.forEach((d) => d.dispose());
@@ -143,7 +143,7 @@ export class PanePanel {
         break;
       case 'RUNTIME_ERROR':
         // Log to the output channel; WebView already shows the ErrorCard
-        console.error('[Pane runtime error]', msg.message, msg.stack);
+        console.error('[Glance runtime error]', msg.message, msg.stack);
         break;
       case 'REFRESH_REQUEST':
         this.triggerUpdate();

@@ -58,7 +58,7 @@ export function getWebviewHtml(
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pane Preview</title>
+  <title>Glance Preview</title>
   <link rel="stylesheet" href="${codiconsUri}" />
   <style nonce="${nonce}">
     * { box-sizing: border-box; margin: 0; padding: 0; }

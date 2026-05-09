@@ -1,6 +1,6 @@
 {
-  "name": "pane",
-  "displayName": "Pane — React Component Preview",
+  "name": "glance",
+  "displayName": "Glance — React Component Preview",
   "description": "Instant sandboxed preview for React (.jsx/.tsx) components. No dev server required.",
   "version": "0.1.0",
   "publisher": "divij",
@@ -17,19 +17,19 @@
   "contributes": {
     "commands": [
       {
-        "command": "pane.openPreview",
-        "title": "Pane: Open Preview",
-        "category": "Pane"
+        "command": "glance.openPreview",
+        "title": "Glance: Open Preview",
+        "category": "Glance"
       },
       {
-        "command": "pane.closePreview",
-        "title": "Pane: Close Preview",
-        "category": "Pane"
+        "command": "glance.closePreview",
+        "title": "Glance: Close Preview",
+        "category": "Glance"
       }
     ],
     "keybindings": [
       {
-        "command": "pane.openPreview",
+        "command": "glance.openPreview",
         "key": "ctrl+alt+p",
         "mac": "cmd+alt+p",
         "when": "editorLangId == javascriptreact || editorLangId == typescriptreact"
@@ -38,33 +38,33 @@
     "menus": {
       "editor/context": [
         {
-          "command": "pane.openPreview",
+          "command": "glance.openPreview",
           "when": "editorLangId == javascriptreact || editorLangId == typescriptreact",
           "group": "navigation"
         }
       ]
     },
     "configuration": {
-      "title": "Pane",
+      "title": "Glance",
       "properties": {
-        "pane.refreshMode": {
+        "glance.refreshMode": {
           "type": "string",
           "enum": ["save", "live"],
           "default": "save",
           "description": "When to refresh the preview: on file save, or on every keystroke (live mode)."
         },
-        "pane.liveDebounceMs": {
+        "glance.liveDebounceMs": {
           "type": "number",
           "default": 400,
           "description": "Debounce delay in milliseconds for live refresh mode."
         },
-        "pane.defaultViewport": {
+        "glance.defaultViewport": {
           "type": "string",
           "enum": ["mobile", "tablet", "desktop"],
           "default": "desktop",
           "description": "Default viewport preset when opening a new preview."
         },
-        "pane.defaultTheme": {
+        "glance.defaultTheme": {
           "type": "string",
           "enum": ["light", "dark", "system"],
           "default": "dark",
