@@ -1,0 +1,96 @@
+{
+  "name": "pane",
+  "displayName": "Pane — React Component Preview",
+  "description": "Instant sandboxed preview for React (.jsx/.tsx) components. No dev server required.",
+  "version": "0.1.0",
+  "publisher": "divij",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["react", "preview", "jsx", "tsx", "component"],
+  "activationEvents": [
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "pane.openPreview",
+        "title": "Pane: Open Preview",
+        "category": "Pane"
+      },
+      {
+        "command": "pane.closePreview",
+        "title": "Pane: Close Preview",
+        "category": "Pane"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "pane.openPreview",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p",
+        "when": "editorLangId == javascriptreact || editorLangId == typescriptreact"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "pane.openPreview",
+          "when": "editorLangId == javascriptreact || editorLangId == typescriptreact",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Pane",
+      "properties": {
+        "pane.refreshMode": {
+          "type": "string",
+          "enum": ["save", "live"],
+          "default": "save",
+          "description": "When to refresh the preview: on file save, or on every keystroke (live mode)."
+        },
+        "pane.liveDebounceMs": {
+          "type": "number",
+          "default": 400,
+          "description": "Debounce delay in milliseconds for live refresh mode."
+        },
+        "pane.defaultViewport": {
+          "type": "string",
+          "enum": ["mobile", "tablet", "desktop"],
+          "default": "desktop",
+          "description": "Default viewport preset when opening a new preview."
+        },
+        "pane.defaultTheme": {
+          "type": "string",
+          "enum": ["light", "dark", "system"],
+          "default": "dark",
+          "description": "Default sandbox background theme."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.js",
+    "watch": "node esbuild.config.js --watch",
+    "package": "pnpm run build && vsce package",
+    "lint": "eslint src webview --ext .ts,.tsx"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "esbuild-wasm": "^0.20.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
