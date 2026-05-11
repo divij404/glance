@@ -53,12 +53,13 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
       stdin: {
         contents: wrappedSource,
         loader: fileName.endsWith('.tsx') || fileName.endsWith('.ts') ? 'tsx' : 'jsx',
-        // resolveDir points to the extension root so esbuild finds react/react-dom
-        // in the extension's node_modules. Relative imports from the user's file
-        // are handled by makeImportResolverPlugin which uses fileDir directly.
-        resolveDir: EXTENSION_ROOT,
+        // resolveDir = user's file directory so relative imports (./Foo) resolve correctly.
+        // EXTENSION_ROOT is added via nodePaths so bare specifiers (react, react-dom)
+        // are found in the extension's node_modules.
+        resolveDir: fileDir,
         sourcefile: fileName,
       },
+      nodePaths: [path.join(EXTENSION_ROOT, 'node_modules')],
       bundle: true,
       format: 'iife',
       globalName: '__glance_module__',

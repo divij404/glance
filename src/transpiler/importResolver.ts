@@ -69,6 +69,14 @@ export function makeImportResolverPlugin(
           collectedDeps.push(uri);
         }
 
+        // Prefer in-memory buffer (live edits) over disk content
+        const openDoc = vscode.workspace.textDocuments.find(
+          (d) => d.uri.toString() === uri.toString(),
+        );
+        const finalContents = openDoc
+          ? Buffer.from(openDoc.getText(), 'utf8')
+          : contents;
+
         const ext = path.extname(resolvedPath).slice(1) || 'tsx';
         const loaderMap: Record<string, 'tsx' | 'ts' | 'jsx' | 'js' | 'css' | 'text'> = {
           tsx: 'tsx', ts: 'ts', jsx: 'jsx', js: 'js',
@@ -77,7 +85,7 @@ export function makeImportResolverPlugin(
         const loader = loaderMap[ext] ?? 'tsx';
 
         return {
-          contents,
+          contents: finalContents,
           loader,
           resolveDir: path.dirname(resolvedPath),
         };
