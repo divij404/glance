@@ -66,6 +66,9 @@ export function getErrorHtml(message: string, file: string, line: number, col: n
  * vscode-resource.vscode-cdn.net hostname. We allow that exact host.
  */
 export function getPreviewHtml(bundleScriptUri: string): string {
+  // Cache-bust with a timestamp so the webview reloads the bundle on every update.
+  // Without this, setting webview.html to the same string is a no-op.
+  const bust = Date.now();
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,7 +80,7 @@ export function getPreviewHtml(bundleScriptUri: string): string {
 </head>
 <body>
   <div id="root"></div>
-  <script src="${bundleScriptUri}"></script>
+  <script src="${bundleScriptUri}?v=${bust}"></script>
 </body>
 </html>`;
 }

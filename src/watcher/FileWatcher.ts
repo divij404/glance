@@ -37,6 +37,13 @@ export class FileWatcher implements vscode.Disposable {
     ]);
   }
 
+  /** Return current dependency URIs (excluding the primary file). */
+  getDependencies(): vscode.Uri[] {
+    return [...this._trackedUris]
+      .filter((u) => u !== this._primaryUri.toString())
+      .map((u) => vscode.Uri.parse(u));
+  }
+
   dispose(): void {
     if (this._debounceTimer !== null) {
       clearTimeout(this._debounceTimer);
@@ -51,18 +58,14 @@ export class FileWatcher implements vscode.Disposable {
     this._disposables.push(
       vscode.workspace.onDidSaveTextDocument((doc) => {
         if (this._trackedUris.has(doc.uri.toString())) {
-          // Always fire on save regardless of mode (save mode = only this fires)
-          if (this._mode === 'save') {
-            this._onUpdate();
-          }
+          this._onUpdate();
         }
       }),
 
       vscode.workspace.onDidChangeTextDocument((e) => {
-        if (
-          this._mode === 'live' &&
-          this._trackedUris.has(e.document.uri.toString())
-        ) {
+        // Ignore non-file schemes (output channels, git, etc.) to avoid feedback loops
+        if (e.document.uri.scheme !== 'file') { return; }
+        if (this._mode === 'live' && this._trackedUris.has(e.document.uri.toString())) {
           this._debounce();
         }
       }),

@@ -9,6 +9,35 @@ import { outputChannel } from '../extension';
 
 const GLANCE_TMP_DIR = path.join(os.tmpdir(), 'glance-preview');
 
+// ── Status bar ────────────────────────────────────────────────────────────────
+
+let _statusBar: vscode.StatusBarItem | null = null;
+
+function ensureStatusBar(): vscode.StatusBarItem {
+  if (!_statusBar) {
+    _statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    _statusBar.command = 'glance.toggleRefreshMode';
+    _statusBar.tooltip = 'Click to toggle Glance refresh mode (save ↔ live)';
+  }
+  return _statusBar;
+}
+
+export function updateStatusBar(): void {
+  const bar = ensureStatusBar();
+  const { refreshMode } = getSettings();
+  bar.text = refreshMode === 'live' ? '$(eye) Glance: live' : '$(save) Glance: save';
+  if (GlancePanel.hasAny()) {
+    bar.show();
+  } else {
+    bar.hide();
+  }
+}
+
+export function disposeStatusBar(): void {
+  _statusBar?.dispose();
+  _statusBar = null;
+}
+
 /**
  * Singleton-per-file manager for the Glance preview WebviewPanel.
  *
@@ -33,6 +62,17 @@ export class GlancePanel {
 
     // Dispose when the panel is closed
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
+
+    // Rewire watcher when glance config changes
+    this._disposables.push(
+      vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('glance.refreshMode') || e.affectsConfiguration('glance.liveDebounceMs')) {
+          outputChannel.appendLine('[Glance] Config changed — rewiring watcher');
+          this._rewireWatcher();
+          updateStatusBar();
+        }
+      }),
+    );
 
     // Start watching and do first transpile
     this._startWatcher();
@@ -64,6 +104,7 @@ export class GlancePanel {
 
     const instance = new GlancePanel(panel, fileUri);
     GlancePanel.panels.set(key, instance);
+    updateStatusBar();
     return instance;
   }
 
@@ -76,12 +117,26 @@ export class GlancePanel {
     GlancePanel.panels.clear();
   }
 
+  static hasAny(): boolean {
+    return GlancePanel.panels.size > 0;
+  }
+
+  /** Toggle refreshMode in VS Code settings (used by status bar command). */
+  static async toggleRefreshMode(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('glance');
+    const current = cfg.get<string>('refreshMode', 'save');
+    const next = current === 'save' ? 'live' : 'save';
+    await cfg.update('refreshMode', next, vscode.ConfigurationTarget.Global);
+    // onDidChangeConfiguration fires → rewires all watchers + updates status bar
+  }
+
   dispose(): void {
     GlancePanel.panels.delete(this._fileUri.toString());
     this._watcher?.dispose();
     this._panel.dispose();
     this._disposables.forEach((d) => d.dispose());
     this._disposables = [];
+    updateStatusBar();
   }
 
   // ── Internal ──────────────────────────────────────────────────────────────
@@ -95,6 +150,11 @@ export class GlancePanel {
 
       if (result.kind === 'ok') {
         outputChannel.appendLine(`[Glance] bundle written to: ${result.bundlePath}`);
+
+        // Update the watcher's dependency set so changes to imported files
+        // also trigger a re-transpile
+        this._watcher?.setDependencies(result.dependencies);
+
         // Convert the file URI to a webview URI (vscode-resource://...)
         const scriptUri = this._panel.webview.asWebviewUri(result.bundleUri);
         this._panel.webview.html = getPreviewHtml(scriptUri.toString());
@@ -121,6 +181,26 @@ export class GlancePanel {
       settings.liveDebounceMs,
       () => this.triggerUpdate(),
     );
+    this._disposables.push(this._watcher);
+  }
+
+  private _rewireWatcher(): void {
+    // Grab existing dependencies before tearing down the old watcher
+    const existingDeps = this._watcher ? this._watcher.getDependencies() : [];
+
+    // Dispose old watcher (removes it from _disposables by rebuilding without it)
+    this._watcher?.dispose();
+    this._disposables = this._disposables.filter((d) => d !== this._watcher);
+
+    // Create new watcher with updated settings
+    const settings = getSettings();
+    this._watcher = new FileWatcher(
+      this._fileUri,
+      settings.refreshMode,
+      settings.liveDebounceMs,
+      () => this.triggerUpdate(),
+    );
+    this._watcher.setDependencies(existingDeps);
     this._disposables.push(this._watcher);
   }
 }

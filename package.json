@@ -1,6 +1,6 @@
 {
   "name": "glance",
-  "displayName": "Glance — React Component Preview",
+  "displayName": "Glance - React Component Preview",
   "description": "Instant sandboxed preview for React (.jsx/.tsx) components. No dev server required.",
   "version": "0.1.0",
   "publisher": "divij",
@@ -24,6 +24,11 @@
       {
         "command": "glance.closePreview",
         "title": "Glance: Close Preview",
+        "category": "Glance"
+      },
+      {
+        "command": "glance.toggleRefreshMode",
+        "title": "Glance: Toggle Refresh Mode",
         "category": "Glance"
       }
     ],
@@ -77,7 +82,7 @@
     "build": "node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
     "package": "pnpm run build && vsce package",
-    "lint": "eslint src webview --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { openPreview } from './commands/openPreview';
 import { closePreview } from './commands/closePreview';
-import { GlancePanel } from './panel/GlancePanel';
+import { GlancePanel, updateStatusBar, disposeStatusBar } from './panel/GlancePanel';
 
 export let outputChannel: vscode.OutputChannel;
 
@@ -26,9 +26,22 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('glance.closePreview', () =>
       closePreview(),
     ),
+    vscode.commands.registerCommand('glance.toggleRefreshMode', () =>
+      GlancePanel.toggleRefreshMode(),
+    ),
+  );
+
+  // Keep status bar in sync when user edits settings.json directly
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('glance')) {
+        updateStatusBar();
+      }
+    }),
   );
 }
 
 export function deactivate(): void {
   GlancePanel.disposeAll();
+  disposeStatusBar();
 }

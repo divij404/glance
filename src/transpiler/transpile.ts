@@ -29,9 +29,14 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
   try {
     const esbuild = await getEsbuild();
 
-    // Read the entry file
-    const sourceBytes = await vscode.workspace.fs.readFile(fileUri);
-    const sourceText = Buffer.from(sourceBytes).toString('utf8');
+    // Read the entry file — prefer the in-memory buffer so live mode reflects
+    // unsaved edits. Fall back to disk if the file isn't open in an editor.
+    const openDoc = vscode.workspace.textDocuments.find(
+      (d) => d.uri.toString() === fileUri.toString(),
+    );
+    const sourceText = openDoc
+      ? openDoc.getText()
+      : Buffer.from(await vscode.workspace.fs.readFile(fileUri)).toString('utf8');
     const fileDir = path.dirname(fileUri.fsPath);
     const fileName = path.basename(fileUri.fsPath);
 
