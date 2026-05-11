@@ -1,4 +1,5 @@
-// esbuild.config.js — builds both the extension host and the WebView bundle
+// esbuild.config.js — builds the extension host only.
+// The webview HTML is generated as a string in panelHtml.ts — no separate bundle needed.
 const esbuild = require('esbuild');
 
 const watch = process.argv.includes('--watch');
@@ -10,8 +11,6 @@ const baseOpts = {
   logLevel: 'info',
 };
 
-// ── Extension host bundle ──────────────────────────────────────────────────
-// CommonJS, external vscode (provided by VS Code at runtime)
 const extensionOpts = {
   ...baseOpts,
   entryPoints: ['src/extension.ts'],
@@ -19,39 +18,18 @@ const extensionOpts = {
   format: 'cjs',
   platform: 'node',
   target: 'node18',
-  external: ['vscode'],
-  // esbuild-wasm ships its own .wasm binary; mark it external so it's
-  // copied as-is rather than bundled into the JS.
-  loader: { '.wasm': 'copy' },
-};
-
-// ── WebView bundle ─────────────────────────────────────────────────────────
-// IIFE/ESM for browser context.  React/ReactDOM are bundled in because the
-// WebView has no module resolution of its own.
-const webviewOpts = {
-  ...baseOpts,
-  entryPoints: ['webview/index.tsx'],
-  outfile: 'dist/webview.js',
-  format: 'iife',
-  platform: 'browser',
-  target: 'es2020',
-  jsx: 'automatic',
-  jsxImportSource: 'react',
+  // vscode is provided by VS Code at runtime.
+  // esbuild is a native Node addon — must NOT be bundled.
+  external: ['vscode', 'esbuild'],
 };
 
 async function build() {
   if (watch) {
-    const [extCtx, wvCtx] = await Promise.all([
-      esbuild.context(extensionOpts),
-      esbuild.context(webviewOpts),
-    ]);
-    await Promise.all([extCtx.watch(), wvCtx.watch()]);
+    const ctx = await esbuild.context(extensionOpts);
+    await ctx.watch();
     console.log('Watching for changes…');
   } else {
-    await Promise.all([
-      esbuild.build(extensionOpts),
-      esbuild.build(webviewOpts),
-    ]);
+    await esbuild.build(extensionOpts);
     console.log('Build complete.');
   }
 }

@@ -1,60 +1,47 @@
 import * as vscode from 'vscode';
-import { getNonce, getWebviewHtml } from './panelHtml';
-import { ExtToWebview, WebviewToExt } from './panelMessages';
+import * as os from 'os';
+import * as path from 'path';
+import { getLoadingHtml, getErrorHtml, getPreviewHtml } from './panelHtml';
 import { transpile } from '../transpiler/transpile';
 import { FileWatcher } from '../watcher/FileWatcher';
 import { getSettings } from '../config/settings';
+import { outputChannel } from '../extension';
+
+const GLANCE_TMP_DIR = path.join(os.tmpdir(), 'glance-preview');
 
 /**
- * Singleton-per-file manager for the Pane preview WebviewPanel.
+ * Singleton-per-file manager for the Glance preview WebviewPanel.
  *
- * Only one panel exists per file URI. Calling openOrReveal on the same
- * file brings the existing panel to the foreground instead of opening a
- * second one.
+ * On each transpile we set webview.html directly to a full self-contained
+ * document — no nested iframe, no vscode-resource URI issues.
  */
 export class GlancePanel {
   private static panels = new Map<string, GlancePanel>();
 
   private readonly _panel: vscode.WebviewPanel;
   private readonly _fileUri: vscode.Uri;
-  private readonly _extensionUri: vscode.Uri;
   private _watcher: FileWatcher | null = null;
   private _disposables: vscode.Disposable[] = [];
-  private _nonce: string;
 
-  private constructor(
-    panel: vscode.WebviewPanel,
-    fileUri: vscode.Uri,
-    extensionUri: vscode.Uri,
-  ) {
+  private constructor(panel: vscode.WebviewPanel, fileUri: vscode.Uri) {
     this._panel = panel;
     this._fileUri = fileUri;
-    this._extensionUri = extensionUri;
-    this._nonce = getNonce();
 
-    // Set initial HTML
-    this._refresh();
-
-    // Handle messages from the WebView
-    this._panel.webview.onDidReceiveMessage(
-      (msg: WebviewToExt) => this._handleWebviewMessage(msg),
-      null,
-      this._disposables,
-    );
+    // Show loading state immediately
+    const fileName = fileUri.path.split('/').pop() ?? '';
+    this._panel.webview.html = getLoadingHtml(fileName);
 
     // Dispose when the panel is closed
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
 
-    // Wire up file watcher
+    // Start watching and do first transpile
     this._startWatcher();
+    this.triggerUpdate();
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  static openOrReveal(
-    fileUri: vscode.Uri,
-    extensionUri: vscode.Uri,
-  ): GlancePanel {
+  static openOrReveal(fileUri: vscode.Uri, extensionUri: vscode.Uri): GlancePanel {
     const key = fileUri.toString();
     const existing = GlancePanel.panels.get(key);
     if (existing) {
@@ -69,12 +56,13 @@ export class GlancePanel {
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
-        localResourceRoots: [extensionUri],
+        // Allow loading the bundle.js we write to the OS temp dir
+        localResourceRoots: [vscode.Uri.file(GLANCE_TMP_DIR)],
         retainContextWhenHidden: true,
       },
     );
 
-    const instance = new GlancePanel(panel, fileUri, extensionUri);
+    const instance = new GlancePanel(panel, fileUri);
     GlancePanel.panels.set(key, instance);
     return instance;
   }
@@ -98,59 +86,30 @@ export class GlancePanel {
 
   // ── Internal ──────────────────────────────────────────────────────────────
 
-  private _refresh(): void {
-    const fileName = this._fileUri.path.split('/').pop() ?? '';
-    this._panel.webview.html = getWebviewHtml(
-      this._panel.webview,
-      this._extensionUri,
-      this._nonce,
-      fileName,
-    );
-  }
-
-  /** Trigger a full transpile → postMessage cycle. */
   async triggerUpdate(): Promise<void> {
-    this._post({ type: 'LOADING' });
+    const fileName = this._fileUri.path.split('/').pop() ?? '';
+    outputChannel.appendLine(`[Glance] triggerUpdate: ${fileName}`);
+    try {
+      const result = await transpile(this._fileUri);
+      outputChannel.appendLine(`[Glance] transpile result: ${result.kind}`);
 
-    const result = await transpile(this._fileUri);
-
-    if (result.kind === 'ok') {
-      this._post({
-        type: 'UPDATE',
-        code: result.code,
-        timestamp: Date.now(),
-      });
-    } else {
-      this._post({
-        type: 'TRANSPILE_ERROR',
-        message: result.message,
-        file: result.file,
-        line: result.line,
-        col: result.col,
-      });
-    }
-  }
-
-  private _post(msg: ExtToWebview): void {
-    this._panel.webview.postMessage(msg);
-  }
-
-  private _handleWebviewMessage(msg: WebviewToExt): void {
-    switch (msg.type) {
-      case 'READY':
-        // WebView is mounted — do the first transpile
-        this.triggerUpdate();
-        break;
-      case 'RUNTIME_ERROR':
-        // Log to the output channel; WebView already shows the ErrorCard
-        console.error('[Glance runtime error]', msg.message, msg.stack);
-        break;
-      case 'REFRESH_REQUEST':
-        this.triggerUpdate();
-        break;
-      case 'VIEWPORT_CHANGE':
-        // No-op in the extension host; the WebView manages viewport state
-        break;
+      if (result.kind === 'ok') {
+        outputChannel.appendLine(`[Glance] bundle written to: ${result.bundlePath}`);
+        // Convert the file URI to a webview URI (vscode-resource://...)
+        const scriptUri = this._panel.webview.asWebviewUri(result.bundleUri);
+        this._panel.webview.html = getPreviewHtml(scriptUri.toString());
+        outputChannel.appendLine(`[Glance] webview.html set (preview), scriptUri: ${scriptUri}`);
+      } else {
+        outputChannel.appendLine(`[Glance] transpile error: ${result.message} at ${result.file}:${result.line}:${result.col}`);
+        this._panel.webview.html = getErrorHtml(
+          result.message,
+          result.file,
+          result.line,
+          result.col,
+        );
+      }
+    } catch (err) {
+      outputChannel.appendLine(`[Glance] EXCEPTION in triggerUpdate: ${err}`);
     }
   }
 
