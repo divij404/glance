@@ -80,7 +80,7 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
       return {
         kind: 'error',
         message: err.text,
-        file: err.location?.file ?? fileName,
+        file: (err.location?.file ?? fileName).replace(/^local-file:/, ''),
         line: err.location?.line ?? 0,
         col: err.location?.column ?? 0,
       };

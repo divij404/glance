@@ -4,5 +4,5 @@ dist/
 .DS_Store
 *.log
 docs/
-.vscode
+.vscode/
 testing/

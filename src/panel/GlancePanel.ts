@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
-import { getLoadingHtml, getErrorHtml, getPreviewHtml } from './panelHtml';
+import { getLoadingHtml, getPreviewHtml } from './panelHtml';
 import { transpile } from '../transpiler/transpile';
 import { FileWatcher } from '../watcher/FileWatcher';
 import { getSettings } from '../config/settings';
@@ -96,7 +96,6 @@ export class GlancePanel {
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
-        // Allow loading the bundle.js we write to the OS temp dir
         localResourceRoots: [vscode.Uri.file(GLANCE_TMP_DIR)],
         retainContextWhenHidden: true,
       },
@@ -144,34 +143,37 @@ export class GlancePanel {
   async triggerUpdate(): Promise<void> {
     const fileName = this._fileUri.path.split('/').pop() ?? '';
     outputChannel.appendLine(`[Glance] triggerUpdate: ${fileName}`);
+
     try {
       const result = await transpile(this._fileUri);
       outputChannel.appendLine(`[Glance] transpile result: ${result.kind}`);
 
       if (result.kind === 'ok') {
-        outputChannel.appendLine(`[Glance] bundle written to: ${result.bundlePath}`);
-
-        // Update the watcher's dependency set so changes to imported files
-        // also trigger a re-transpile
         this._watcher?.setDependencies(result.dependencies);
-
-        // Convert the file URI to a webview URI (vscode-resource://...)
-        const scriptUri = this._panel.webview.asWebviewUri(result.bundleUri);
-        this._panel.webview.html = getPreviewHtml(scriptUri.toString());
-        outputChannel.appendLine(`[Glance] webview.html set (preview), scriptUri: ${scriptUri}`);
+        const scriptUri = this._panel.webview.asWebviewUri(result.bundleUri).toString();
+        this._panel.webview.html = getPreviewHtml(scriptUri);
+        this._lastGoodScriptUri = scriptUri;
+        outputChannel.appendLine(`[Glance] preview updated`);
       } else {
-        outputChannel.appendLine(`[Glance] transpile error: ${result.message} at ${result.file}:${result.line}:${result.col}`);
-        this._panel.webview.html = getErrorHtml(
-          result.message,
-          result.file,
-          result.line,
-          result.col,
-        );
+        outputChannel.appendLine(`[Glance] transpile error: ${result.message}`);
+        const errorOverlay = {
+          message: result.message,
+          file: result.file,
+          line: result.line,
+          col: result.col,
+        };
+        if (this._lastGoodScriptUri) {
+          this._panel.webview.html = getPreviewHtml(this._lastGoodScriptUri, errorOverlay);
+        } else {
+          this._panel.webview.html = getPreviewHtml('', errorOverlay);
+        }
       }
     } catch (err) {
       outputChannel.appendLine(`[Glance] EXCEPTION in triggerUpdate: ${err}`);
     }
   }
+
+  private _lastGoodScriptUri: string | null = null;
 
   private _startWatcher(): void {
     const settings = getSettings();
