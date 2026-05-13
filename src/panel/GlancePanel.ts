@@ -151,8 +151,9 @@ export class GlancePanel {
       if (result.kind === 'ok') {
         this._watcher?.setDependencies(result.dependencies);
         const scriptUri = this._panel.webview.asWebviewUri(result.bundleUri).toString();
-        this._panel.webview.html = getPreviewHtml(scriptUri);
+        this._panel.webview.html = getPreviewHtml(scriptUri, undefined, result.cssText);
         this._lastGoodScriptUri = scriptUri;
+        this._lastGoodCssText = result.cssText;
         outputChannel.appendLine(`[Glance] preview updated`);
       } else {
         outputChannel.appendLine(`[Glance] transpile error: ${result.message}`);
@@ -163,7 +164,7 @@ export class GlancePanel {
           col: result.col,
         };
         if (this._lastGoodScriptUri) {
-          this._panel.webview.html = getPreviewHtml(this._lastGoodScriptUri, errorOverlay);
+          this._panel.webview.html = getPreviewHtml(this._lastGoodScriptUri, errorOverlay, this._lastGoodCssText);
         } else {
           this._panel.webview.html = getPreviewHtml('', errorOverlay);
         }
@@ -174,6 +175,7 @@ export class GlancePanel {
   }
 
   private _lastGoodScriptUri: string | null = null;
+  private _lastGoodCssText: string = '';
 
   private _startWatcher(): void {
     const settings = getSettings();

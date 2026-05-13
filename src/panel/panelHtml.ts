@@ -76,7 +76,7 @@ export interface ErrorOverlay {
   col: number;
 }
 
-export function getPreviewHtml(bundleScriptUri: string, error?: ErrorOverlay): string {
+export function getPreviewHtml(bundleScriptUri: string, error?: ErrorOverlay, cssText?: string): string {
   const bust = Date.now();
   const nonce = getNonce();
 
@@ -211,6 +211,7 @@ export function getPreviewHtml(bundleScriptUri: string, error?: ErrorOverlay): s
     #glance-error.expanded .err-detail { display: block; }
     #glance-error .err-msg { color: #ddd; font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
   </style>
+  ${cssText ? `<style>${cssText}</style>` : ''}
 </head>
 <body>
   <div id="glance-toolbar">

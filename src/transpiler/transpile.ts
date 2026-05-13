@@ -13,7 +13,7 @@ const EXTENSION_ROOT = path.join(__dirname, '..');
 const GLANCE_TMP_DIR = path.join(os.tmpdir(), 'glance-preview');
 
 export type TranspileResult =
-  | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; dependencies: vscode.Uri[] }
+  | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; dependencies: vscode.Uri[] }
   | { kind: 'error'; message: string; file: string; line: number; col: number };
 
 // ── esbuild (native Node build) ───────────────────────────────────────────
@@ -67,6 +67,7 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
       target: 'es2020',
       jsx: 'automatic',
       write: false,
+      outdir: GLANCE_TMP_DIR,
       plugins: [
         makeImportResolverPlugin(fileDir, collectedDeps),
         esmShimPlugin,
@@ -86,7 +87,11 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
       };
     }
 
-    const userCode = result.outputFiles[0].text;
+    // esbuild outputs JS first, then CSS (if any styles were imported)
+    const jsFile = result.outputFiles.find((f) => f.path.endsWith('.js'));
+    const cssFile = result.outputFiles.find((f) => f.path.endsWith('.css'));
+    const userCode = jsFile?.text ?? result.outputFiles[0].text;
+    const cssText = cssFile?.text ?? '';
 
     // Append the mount harness directly into the bundle file.
     // This way the webview HTML only needs a single <script src> with no
@@ -119,7 +124,7 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     fs.writeFileSync(bundlePath, userCode + mountHarness, 'utf8');
     const bundleUri = vscode.Uri.file(bundlePath);
 
-    return { kind: 'ok', bundleUri, bundlePath, dependencies: collectedDeps };
+    return { kind: 'ok', bundleUri, bundlePath, cssText, dependencies: collectedDeps };
 
   } catch (e: unknown) {
     // esbuild throws an object with .errors array on build failure
