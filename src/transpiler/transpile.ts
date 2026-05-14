@@ -137,7 +137,10 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     var _props = ${propsJson};
     function _render(props) {
       _props = props;
-      _root.render(React.createElement(Component, props));
+      // Use JSON key so stateful components remount when props change,
+      // ensuring useState(prop) reinitializes with the new value.
+      var key = JSON.stringify(props);
+      _root.render(React.createElement(Component, Object.assign({ key: key }, props)));
     }
     window.__glance_render__ = _render;
     window.__glance_props__ = _props;
