@@ -99,12 +99,23 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
 
     if (result.errors.length > 0) {
       const err = result.errors[0];
+      const loc = err.location;
+      // Append source context line + caret if available
+      let message = err.text;
+      if (loc?.lineText) {
+        const caret = ' '.repeat(loc.column ?? 0) + '^';
+        message += `\n\n${loc.lineText}\n${caret}`;
+      }
+      // Append any notes (esbuild often adds helpful hints here)
+      if (err.notes?.length) {
+        message += '\n\n' + err.notes.map((n) => n.text).join('\n');
+      }
       return {
         kind: 'error',
-        message: err.text,
-        file: (err.location?.file ?? fileName).replace(/^local-file:/, ''),
-        line: err.location?.line ?? 0,
-        col: err.location?.column ?? 0,
+        message,
+        file: (loc?.file ?? fileName).replace(/^local-file:/, ''),
+        line: loc?.line ?? 0,
+        col: loc?.column ?? 0,
       };
     }
 
@@ -146,9 +157,13 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     window.__glance_props__ = _props;
     _render(_props);
   } catch (err) {
+    var msg = err && err.message ? err.message : String(err);
+    var stack = err && err.stack ? "\\n\\n" + err.stack.split("\\n").slice(1, 4).join("\\n") : "";
     document.body.innerHTML =
-      "<div style=\\"padding:16px;color:#e06c75;font-family:monospace;white-space:pre-wrap\\">"
-      + err.message + "\\n" + (err.stack || "") + "</div>";
+      "<div style=\\"padding:20px;font-family:'Segoe UI',system-ui,sans-serif;\\">" +
+      "<div style=\\"color:#e06c75;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;\\">Runtime Error</div>" +
+      "<div style=\\"color:#ddd;font-family:monospace;font-size:13px;white-space:pre-wrap;line-height:1.5;\\">" + msg + stack + "</div>" +
+      "</div>";
   }
 })();
 `;
