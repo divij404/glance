@@ -13,9 +13,29 @@ const EXTENSION_ROOT = path.join(__dirname, '..');
 // Temp dir for writing bundle files that the webview loads as local resources.
 const GLANCE_TMP_DIR = path.join(os.tmpdir(), 'glance-preview');
 
+export type GlanceProps = Record<string, string | number | boolean>;
+
 export type TranspileResult =
-  | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; tailwindMode: 'none' | 'cdn' | 'cli'; dependencies: vscode.Uri[] }
+  | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; tailwindMode: 'none' | 'cdn' | 'cli'; glanceProps: GlanceProps; dependencies: vscode.Uri[] }
   | { kind: 'error'; message: string; file: string; line: number; col: number };
+
+/**
+ * Parse // @glance { ... } from the source file.
+ * Returns the parsed object, or {} if not found / invalid.
+ */
+export function parseGlanceProps(source: string): GlanceProps {
+  const match = source.match(/\/\/\s*@glance\s*(\{[\s\S]*?\})/m);
+  if (!match) { return {}; }
+  try {
+    // Use Function constructor so we support unquoted keys and trailing commas
+    // eslint-disable-next-line no-new-func
+    const obj = new Function(`return (${match[1]})`)();
+    if (typeof obj === 'object' && obj !== null && !Array.isArray(obj)) {
+      return obj as GlanceProps;
+    }
+  } catch { /* ignore parse errors */ }
+  return {};
+}
 
 // ── esbuild (native Node build) ───────────────────────────────────────────
 // We use the native esbuild package in the extension host (Node.js).
@@ -94,9 +114,13 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     const userCode = jsFile?.text ?? result.outputFiles[0].text;
     const cssText = cssFile?.text ?? '';
 
+    // Parse @glance props from source
+    const glanceProps = parseGlanceProps(sourceText);
+    const propsJson = JSON.stringify(glanceProps);
+
     // Append the mount harness directly into the bundle file.
-    // This way the webview HTML only needs a single <script src> with no
-    // inline scripts — avoiding document.write() injection issues entirely.
+    // Props are seeded from the @glance comment; the toolbar can override them
+    // live by calling window.__glance_render__(newProps) without re-transpiling.
     const mountHarness = `
 ;(function() {
   try {
@@ -109,7 +133,15 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     var createRoot = mod.__createRoot;
     var rootEl = document.getElementById("root");
     if (!rootEl) { throw new Error("No #root element found"); }
-    createRoot(rootEl).render(React.createElement(Component, null));
+    var _root = createRoot(rootEl);
+    var _props = ${propsJson};
+    function _render(props) {
+      _props = props;
+      _root.render(React.createElement(Component, props));
+    }
+    window.__glance_render__ = _render;
+    window.__glance_props__ = _props;
+    _render(_props);
   } catch (err) {
     document.body.innerHTML =
       "<div style=\\"padding:16px;color:#e06c75;font-family:monospace;white-space:pre-wrap\\">"
@@ -136,6 +168,7 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
       bundlePath,
       cssText: combinedCss,
       tailwindMode: twResult.kind,
+      glanceProps,
       dependencies: collectedDeps,
     };
 

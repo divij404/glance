@@ -152,10 +152,11 @@ export class GlancePanel {
         this._watcher?.setDependencies(result.dependencies);
         const scriptUri = this._panel.webview.asWebviewUri(result.bundleUri).toString();
         const isCdn = result.tailwindMode === 'cdn';
-        this._panel.webview.html = getPreviewHtml(scriptUri, undefined, result.cssText, isCdn);
+        this._panel.webview.html = getPreviewHtml(scriptUri, undefined, result.cssText, isCdn, result.glanceProps);
         this._lastGoodScriptUri = scriptUri;
         this._lastGoodCssText = result.cssText;
         this._lastGoodTailwindCdn = isCdn;
+        this._lastGoodGlanceProps = result.glanceProps;
         outputChannel.appendLine(`[Glance] preview updated (tailwind: ${result.tailwindMode})`);
       } else {
         outputChannel.appendLine(`[Glance] transpile error: ${result.message}`);
@@ -166,7 +167,7 @@ export class GlancePanel {
           col: result.col,
         };
         if (this._lastGoodScriptUri) {
-          this._panel.webview.html = getPreviewHtml(this._lastGoodScriptUri, errorOverlay, this._lastGoodCssText, this._lastGoodTailwindCdn);
+          this._panel.webview.html = getPreviewHtml(this._lastGoodScriptUri, errorOverlay, this._lastGoodCssText, this._lastGoodTailwindCdn, this._lastGoodGlanceProps);
         } else {
           this._panel.webview.html = getPreviewHtml('', errorOverlay);
         }
@@ -179,6 +180,7 @@ export class GlancePanel {
   private _lastGoodScriptUri: string | null = null;
   private _lastGoodCssText: string = '';
   private _lastGoodTailwindCdn: boolean = false;
+  private _lastGoodGlanceProps: Record<string, string | number | boolean> = {};
 
   private _startWatcher(): void {
     const settings = getSettings();

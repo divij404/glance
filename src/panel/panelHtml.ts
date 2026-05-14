@@ -81,6 +81,7 @@ export function getPreviewHtml(
   error?: ErrorOverlay,
   cssText?: string,
   tailwindCdn?: boolean,
+  glanceProps?: Record<string, string | number | boolean>,
 ): string {
   const bust = Date.now();
   const nonce = getNonce();
@@ -99,6 +100,43 @@ export function getPreviewHtml(
     <div class="err-detail"><div class="err-msg">${safeMsg}</div></div>
   </div>`;
   })() : `<div id="glance-error"></div>`;
+
+  // Build props controls for the second toolbar row
+  const HEX_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+  const propsRow = glanceProps && Object.keys(glanceProps).length > 0
+    ? (() => {
+        const controls = Object.entries(glanceProps).map(([key, val]) => {
+          const type = typeof val;
+          if (type === 'boolean') {
+            return `<label class="tb-prop-item" title="${key}">
+              <span class="tb-prop-name">${key}</span>
+              <input class="tb-prop-check" type="checkbox" data-key="${key}" data-type="boolean"${val ? ' checked' : ''}/>
+            </label>`;
+          } else if (type === 'number') {
+            return `<label class="tb-prop-item" title="${key}">
+              <span class="tb-prop-name">${key}</span>
+              <input class="tb-prop-input tb-prop-number" type="number" data-key="${key}" data-type="number" value="${val}"/>
+            </label>`;
+          } else if (HEX_RE.test(String(val))) {
+            const safe = String(val).replace(/"/g, '&quot;');
+            return `<label class="tb-prop-item tb-prop-color-item" title="${key}">
+              <span class="tb-prop-name">${key}</span>
+              <input class="tb-prop-color" type="color" data-key="${key}" data-type="string" value="${safe}"/>
+            </label>`;
+          } else {
+            const safe = String(val).replace(/"/g, '&quot;');
+            return `<label class="tb-prop-item" title="${key}">
+              <span class="tb-prop-name">${key}</span>
+              <input class="tb-prop-input tb-prop-text" type="text" data-key="${key}" data-type="string" value="${safe}"/>
+            </label>`;
+          }
+        }).join('');
+        return `<div id="glance-props-bar">
+          <span class="tb-label">props</span>
+          <div class="tb-props-controls">${controls}</div>
+        </div>`;
+      })()
+    : '';
 
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
@@ -153,12 +191,51 @@ export function getPreviewHtml(
     .tb-btn.tb-icon { font-size: 14px; min-width: 30px; padding: 2px 6px; }
     .tb-label { color: #555; font-size: 10px; padding: 0 6px 0 2px; letter-spacing: 0.04em; text-transform: uppercase; }
 
+    /* ── Props row (second toolbar bar) ── */
+    #glance-props-bar {
+      position: fixed;
+      top: 36px; left: 0; right: 0;
+      min-height: 30px;
+      background: #272727;
+      border-bottom: 1px solid #1a1a1a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      z-index: 9997;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 11px;
+      user-select: none;
+      flex-wrap: wrap;
+    }
+    .tb-props-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .tb-prop-item { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    .tb-prop-name { color: #999; font-size: 11px; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .tb-prop-input {
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 3px;
+      color: #ccc;
+      font-size: 11px;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 22px;
+      padding: 0 6px;
+      outline: none;
+      transition: border-color 0.1s;
+    }
+    .tb-prop-input:focus { border-color: #61afef; }
+    .tb-prop-text   { width: 100px; }
+    .tb-prop-number { width: 56px; }
+    .tb-prop-check  { accent-color: #61afef; width: 13px; height: 13px; cursor: pointer; margin: 0; }
+    .tb-prop-color  { width: 28px; height: 22px; padding: 1px; border: 1px solid #3a3a3a; border-radius: 3px; background: #1e1e1e; cursor: pointer; outline: none; }
+    .tb-prop-color:focus { border-color: #61afef; }
+
     /* ── Preview area ── */
     html, body { width: 100%; min-height: 100%; }
-    body { padding-top: 36px; }
+    body { padding-top: ${propsRow ? '66px' : '36px'}; }
 
     #glance-canvas {
-      min-height: calc(100vh - 36px);
+      min-height: calc(100vh - ${propsRow ? '66px' : '36px'});
       padding: 24px;
       overflow-x: auto;
       transition: background 0.15s;
@@ -239,6 +316,7 @@ export function getPreviewHtml(
       <button class="tb-btn" id="th-none"  onclick="setTheme('none')">none</button>
     </div>
   </div>
+  ${propsRow}
 
   <div id="glance-canvas" class="theme-dark">
     <div id="glance-frame" class="vp-desktop">
@@ -296,6 +374,51 @@ export function getPreviewHtml(
         errEl.classList.toggle('expanded');
       });
     }
+
+    // ── Props controls ──
+    function readProps() {
+      var props = {};
+      document.querySelectorAll('[data-key]').forEach(function(el) {
+        var key = el.getAttribute('data-key');
+        var type = el.getAttribute('data-type');
+        if (type === 'boolean') {
+          props[key] = el.checked;
+        } else if (type === 'number') {
+          props[key] = Number(el.value);
+        } else {
+          props[key] = el.value;
+        }
+      });
+      return props;
+    }
+
+    function applyProps() {
+      var props = readProps();
+      saveState({ props: props });
+      if (window.__glance_render__) {
+        window.__glance_render__(props);
+      }
+    }
+
+    // Restore persisted prop values if they match the current prop keys
+    (function restoreProps() {
+      var saved = loadState().props;
+      if (!saved) { return; }
+      document.querySelectorAll('[data-key]').forEach(function(el) {
+        var key = el.getAttribute('data-key');
+        if (!(key in saved)) { return; }
+        var type = el.getAttribute('data-type');
+        if (type === 'boolean') { el.checked = !!saved[key]; }
+        else { el.value = String(saved[key]); }
+      });
+      // Apply restored props to component
+      applyProps();
+    })();
+
+    document.querySelectorAll('[data-key]').forEach(function(el) {
+      el.addEventListener('input', applyProps);
+      el.addEventListener('change', applyProps);
+    });
   </script>
 
   ${bundleScriptUri ? `<script nonce="${nonce}" src="${bundleScriptUri}?v=${bust}"></script>` : ''}
