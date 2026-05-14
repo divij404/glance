@@ -76,7 +76,12 @@ export interface ErrorOverlay {
   col: number;
 }
 
-export function getPreviewHtml(bundleScriptUri: string, error?: ErrorOverlay, cssText?: string): string {
+export function getPreviewHtml(
+  bundleScriptUri: string,
+  error?: ErrorOverlay,
+  cssText?: string,
+  tailwindCdn?: boolean,
+): string {
   const bust = Date.now();
   const nonce = getNonce();
 
@@ -99,6 +104,7 @@ export function getPreviewHtml(bundleScriptUri: string, error?: ErrorOverlay, cs
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  ${tailwindCdn ? `<script src="https://cdn.tailwindcss.com"></script>` : ''}
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 

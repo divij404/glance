@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { esmShimPlugin } from './esmShim';
 import { makeImportResolverPlugin } from './importResolver';
+import { detectAndBuildTailwind } from './tailwind';
 
 // Root of the extension package — this is where node_modules/react lives.
 // __dirname is dist/ at runtime, so one level up is the extension root.
@@ -13,7 +14,7 @@ const EXTENSION_ROOT = path.join(__dirname, '..');
 const GLANCE_TMP_DIR = path.join(os.tmpdir(), 'glance-preview');
 
 export type TranspileResult =
-  | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; dependencies: vscode.Uri[] }
+  | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; tailwindMode: 'none' | 'cdn' | 'cli'; dependencies: vscode.Uri[] }
   | { kind: 'error'; message: string; file: string; line: number; col: number };
 
 // ── esbuild (native Node build) ───────────────────────────────────────────
@@ -124,7 +125,19 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     fs.writeFileSync(bundlePath, userCode + mountHarness, 'utf8');
     const bundleUri = vscode.Uri.file(bundlePath);
 
-    return { kind: 'ok', bundleUri, bundlePath, cssText, dependencies: collectedDeps };
+    // Detect and build Tailwind CSS if the user's project uses it
+    const twResult = await detectAndBuildTailwind(fileDir, fileUri.fsPath);
+    const tailwindCss = twResult.kind === 'cli' ? twResult.cssText : '';
+    const combinedCss = [tailwindCss, cssText].filter(Boolean).join('\n');
+
+    return {
+      kind: 'ok',
+      bundleUri,
+      bundlePath,
+      cssText: combinedCss,
+      tailwindMode: twResult.kind,
+      dependencies: collectedDeps,
+    };
 
   } catch (e: unknown) {
     // esbuild throws an object with .errors array on build failure
