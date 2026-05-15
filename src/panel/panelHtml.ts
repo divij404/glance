@@ -189,6 +189,7 @@ export function getPreviewHtml(
     .tb-btn:hover { color: #ccc; }
     .tb-btn.active { color: #61afef; border-bottom-color: #61afef; }
     .tb-btn.tb-icon { font-size: 14px; min-width: 30px; padding: 2px 6px; }
+    .tb-btn:focus-visible { outline: 2px solid #61afef; outline-offset: 1px; border-radius: 2px; }
     .tb-label { color: #555; font-size: 10px; padding: 0 6px 0 2px; letter-spacing: 0.04em; text-transform: uppercase; }
 
     /* ── Props row (second toolbar bar) ── */
@@ -297,23 +298,23 @@ export function getPreviewHtml(
   ${cssText ? `<style>${cssText}</style>` : ''}
 </head>
 <body>
-  <div id="glance-toolbar">
-    <div class="tb-group">
-      <button class="tb-btn tb-icon" id="vp-mobile"  onclick="setViewport('mobile')"  title="Mobile (375px)">
-        <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor"><rect x="1" y="0" width="10" height="16" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4.5" y="13" width="3" height="1.5" rx="0.75"/></svg>
+  <div id="glance-toolbar" role="toolbar" aria-label="Glance preview controls">
+    <div class="tb-group" role="group" aria-label="Viewport">
+      <button class="tb-btn tb-icon" id="vp-mobile"  onclick="setViewport('mobile')"  title="Mobile (375px)"  aria-label="Mobile viewport" aria-pressed="false">
+        <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true"><rect x="1" y="0" width="10" height="16" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4.5" y="13" width="3" height="1.5" rx="0.75"/></svg>
       </button>
-      <button class="tb-btn tb-icon" id="vp-tablet"  onclick="setViewport('tablet')"  title="Tablet (768px)">
-        <svg width="16" height="14" viewBox="0 0 16 14" fill="currentColor"><rect x="0" y="0" width="16" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="6.5" y="11" width="3" height="1.5" rx="0.75"/></svg>
+      <button class="tb-btn tb-icon" id="vp-tablet"  onclick="setViewport('tablet')"  title="Tablet (768px)"  aria-label="Tablet viewport"  aria-pressed="false">
+        <svg width="16" height="14" viewBox="0 0 16 14" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="16" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="6.5" y="11" width="3" height="1.5" rx="0.75"/></svg>
       </button>
-      <button class="tb-btn tb-icon" id="vp-desktop" onclick="setViewport('desktop')" title="Desktop (full)">
-        <svg width="18" height="14" viewBox="0 0 18 14" fill="currentColor"><rect x="0" y="0" width="18" height="11" rx="1.5" ry="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 12 h6 M9 11 v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <button class="tb-btn tb-icon" id="vp-desktop" onclick="setViewport('desktop')" title="Desktop (full)" aria-label="Desktop viewport" aria-pressed="false">
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="18" height="11" rx="1.5" ry="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 12 h6 M9 11 v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
     </div>
-    <div class="tb-group">
-      <span class="tb-label">bg</span>
-      <button class="tb-btn" id="th-dark"  onclick="setTheme('dark')">dark</button>
-      <button class="tb-btn" id="th-light" onclick="setTheme('light')">light</button>
-      <button class="tb-btn" id="th-none"  onclick="setTheme('none')">none</button>
+    <div class="tb-group" role="group" aria-label="Background">
+      <span class="tb-label" aria-hidden="true">bg</span>
+      <button class="tb-btn" id="th-dark"  onclick="setTheme('dark')"  aria-label="Dark background"        aria-pressed="false">dark</button>
+      <button class="tb-btn" id="th-light" onclick="setTheme('light')" aria-label="Light background"       aria-pressed="false">light</button>
+      <button class="tb-btn" id="th-none"  onclick="setTheme('none')"  aria-label="Transparent background" aria-pressed="false">none</button>
     </div>
   </div>
   ${propsRow}
@@ -345,7 +346,9 @@ export function getPreviewHtml(
     function setViewport(vp) {
       frame.className = 'vp-' + vp;
       ['mobile','tablet','desktop'].forEach(function(v) {
-        document.getElementById('vp-' + v).classList.toggle('active', v === vp);
+        var btn = document.getElementById('vp-' + v);
+        btn.classList.toggle('active', v === vp);
+        btn.setAttribute('aria-pressed', String(v === vp));
       });
       saveState({ viewport: vp });
     }
@@ -355,7 +358,9 @@ export function getPreviewHtml(
     function setTheme(th) {
       canvas.className = 'theme-' + th;
       ['dark','light','none'].forEach(function(t) {
-        document.getElementById('th-' + t).classList.toggle('active', t === th);
+        var btn = document.getElementById('th-' + t);
+        btn.classList.toggle('active', t === th);
+        btn.setAttribute('aria-pressed', String(t === th));
       });
       saveState({ theme: th });
     }
@@ -366,6 +371,19 @@ export function getPreviewHtml(
       setViewport(s.viewport);
       setTheme(s.theme);
     })();
+
+    // ── Arrow key navigation within toolbar groups ──
+    document.getElementById('glance-toolbar').addEventListener('keydown', function(e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') { return; }
+      var group = e.target.closest('.tb-group');
+      if (!group) { return; }
+      var btns = Array.prototype.slice.call(group.querySelectorAll('.tb-btn'));
+      var idx = btns.indexOf(e.target);
+      if (idx === -1) { return; }
+      var next = e.key === 'ArrowRight' ? (idx + 1) % btns.length : (idx - 1 + btns.length) % btns.length;
+      btns[next].focus();
+      e.preventDefault();
+    });
 
     // ── Error bar expand/collapse ──
     var errEl = document.getElementById('glance-error');
