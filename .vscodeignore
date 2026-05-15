@@ -1,0 +1,31 @@
+# Source — not needed at runtime
+src/
+webview/
+
+# Config / build tooling
+esbuild.config.js
+tsconfig.json
+tsconfig.webview.json
+tailwind.config.js
+pnpm-lock.yaml
+pnpm-workspace.yaml
+.eslintrc*
+.prettierrc*
+
+# Dev artifacts
+node_modules/
+testing/
+docs/
+dist/**/*.map
+dist/esbuild.wasm
+dist/sandbox.html
+dist/webview.js
+
+# Editor / OS
+.vscode/**
+.DS_Store
+**/*.log
+
+# Git
+.gitignore
+.git/**
