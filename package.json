@@ -20,6 +20,10 @@
     "storybook alternative"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/divij404/glance.git"
+  },
   "activationEvents": [
     "onLanguage:javascriptreact",
     "onLanguage:typescriptreact"
@@ -92,7 +96,7 @@
   "scripts": {
     "build": "node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
-    "package": "npm run build && npx vsce package --allow-missing-repository",
+    "package": "npm run build && npx vsce package",
     "lint": "eslint src --ext .ts,.tsx"
   },
   "devDependencies": {
