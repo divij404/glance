@@ -13,7 +13,9 @@ pnpm-workspace.yaml
 .prettierrc*
 
 # Dev artifacts
-node_modules/
+node_modules/**
+!node_modules/esbuild/**
+!node_modules/@esbuild/**
 testing/
 docs/
 dist/**/*.map
