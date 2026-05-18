@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
-import { getLoadingHtml, getPreviewHtml } from './panelHtml';
+import { getLoadingHtml, getPreviewHtml, getHtmlFilePreviewHtml } from './panelHtml';
 import { transpile } from '../transpiler/transpile';
 import { FileWatcher } from '../watcher/FileWatcher';
 import { getSettings } from '../config/settings';
@@ -148,7 +148,11 @@ export class GlancePanel {
       const result = await transpile(this._fileUri);
       outputChannel.appendLine(`[Glance] transpile result: ${result.kind}`);
 
-      if (result.kind === 'ok') {
+      if (result.kind === 'html') {
+        // Raw HTML file — embed directly in an iframe, no esbuild involved.
+        this._panel.webview.html = getHtmlFilePreviewHtml(result.rawHtml);
+        outputChannel.appendLine('[Glance] HTML preview rendered');
+      } else if (result.kind === 'ok') {
         this._watcher?.setDependencies(result.dependencies);
         const scriptUri = this._panel.webview.asWebviewUri(result.bundleUri).toString();
         const isCdn = result.tailwindMode === 'cdn';

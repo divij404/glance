@@ -64,6 +64,219 @@ export function getFirstLoadErrorHtml(message: string, file: string, line: numbe
 }
 
 /**
+ * Preview for raw .html files.
+ *
+ * The user's HTML is embedded via <iframe srcdoc="..."> so its own <head>,
+ * <style>, and <script> tags don't conflict with Glance's toolbar markup.
+ * Viewport buttons resize the iframe width just like the React preview does
+ * for #glance-frame. The theme background (canvas) is still user-controllable.
+ */
+export function getHtmlFilePreviewHtml(rawHtml: string): string {
+  const nonce = getNonce();
+  // Escape the raw HTML for safe embedding inside a double-quoted srcdoc attribute.
+  // We only need to escape & and " — the browser reconstructs the full DOM from srcdoc.
+  const srcdoc = rawHtml
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;');
+
+  return /* html */ `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; frame-src 'self' data:;" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Toolbar ── */
+    #glance-toolbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 36px;
+      background: #2d2d2d;
+      border-bottom: 2px solid #111;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 0 10px;
+      z-index: 9998;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 11px;
+      user-select: none;
+    }
+    .tb-group {
+      display: flex;
+      align-items: center;
+      gap: 1px;
+      border-right: 1px solid #3a3a3a;
+      padding-right: 6px;
+      margin-right: 4px;
+    }
+    .tb-group:last-child { border-right: none; }
+    .tb-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      color: #888;
+      cursor: pointer;
+      font-size: 11px;
+      font-family: inherit;
+      padding: 4px 7px;
+      transition: color 0.1s, border-color 0.1s;
+      white-space: nowrap;
+      min-width: 44px;
+      text-align: center;
+    }
+    .tb-btn:hover { color: #ccc; }
+    .tb-btn.active { color: #61afef; border-bottom-color: #61afef; }
+    .tb-btn.tb-icon { font-size: 14px; min-width: 30px; padding: 2px 6px; }
+    .tb-btn:focus-visible { outline: 2px solid #61afef; outline-offset: 1px; border-radius: 2px; }
+    .tb-label { color: #555; font-size: 10px; padding: 0 6px 0 2px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .tb-badge { color: #888; font-size: 10px; margin-left: auto; padding-right: 4px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+    /* ── Preview area ── */
+    html, body { width: 100%; min-height: 100%; }
+    body { padding-top: 36px; }
+
+    #glance-canvas {
+      min-height: calc(100vh - 36px);
+      padding: 24px;
+      overflow-x: auto;
+      transition: background 0.15s;
+    }
+    #glance-canvas.theme-dark  { background: #383838; }
+    #glance-canvas.theme-light { background: #e8e8e8; }
+    #glance-canvas.theme-none {
+      background-image: linear-gradient(45deg, #3a3a3a 25%, transparent 25%),
+                        linear-gradient(-45deg, #3a3a3a 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #3a3a3a 75%),
+                        linear-gradient(-45deg, transparent 75%, #3a3a3a 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+      background-color: #2a2a2a;
+    }
+
+    /* ── iframe frame ── */
+    #glance-frame {
+      margin: 0 auto;
+      width: 100%;
+      transition: width 0.2s ease;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 4px 24px rgba(0,0,0,0.35);
+    }
+    #glance-frame.vp-mobile  { width: 375px; }
+    #glance-frame.vp-tablet  { width: 768px; }
+    #glance-frame.vp-desktop { width: 100%; box-shadow: none; }
+
+    #glance-iframe {
+      display: block;
+      width: 100%;
+      border: none;
+      /* Height grows to fit content via ResizeObserver on the iframe's document */
+      min-height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div id="glance-toolbar" role="toolbar" aria-label="Glance preview controls">
+    <div class="tb-group" role="group" aria-label="Viewport">
+      <button class="tb-btn tb-icon" id="vp-mobile"  onclick="setViewport('mobile')"  title="Mobile (375px)"  aria-label="Mobile viewport"  aria-pressed="false">
+        <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor" aria-hidden="true"><rect x="1" y="0" width="10" height="16" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4.5" y="13" width="3" height="1.5" rx="0.75"/></svg>
+      </button>
+      <button class="tb-btn tb-icon" id="vp-tablet"  onclick="setViewport('tablet')"  title="Tablet (768px)"  aria-label="Tablet viewport"  aria-pressed="false">
+        <svg width="16" height="14" viewBox="0 0 16 14" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="16" height="14" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="6.5" y="11" width="3" height="1.5" rx="0.75"/></svg>
+      </button>
+      <button class="tb-btn tb-icon" id="vp-desktop" onclick="setViewport('desktop')" title="Desktop (full)" aria-label="Desktop viewport" aria-pressed="false">
+        <svg width="18" height="14" viewBox="0 0 18 14" fill="currentColor" aria-hidden="true"><rect x="0" y="0" width="18" height="11" rx="1.5" ry="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 12 h6 M9 11 v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="tb-group" role="group" aria-label="Background">
+      <span class="tb-label" aria-hidden="true">bg</span>
+      <button class="tb-btn" id="th-dark"  onclick="setTheme('dark')"  aria-label="Dark background"        aria-pressed="false">dark</button>
+      <button class="tb-btn" id="th-light" onclick="setTheme('light')" aria-label="Light background"       aria-pressed="false">light</button>
+      <button class="tb-btn" id="th-none"  onclick="setTheme('none')"  aria-label="Transparent background" aria-pressed="false">none</button>
+    </div>
+    <span class="tb-badge">HTML</span>
+  </div>
+
+  <div id="glance-canvas" class="theme-dark">
+    <div id="glance-frame" class="vp-desktop">
+      <iframe
+        id="glance-iframe"
+        srcdoc="${srcdoc}"
+        sandbox="allow-scripts allow-same-origin allow-forms"
+        title="HTML preview"
+      ></iframe>
+    </div>
+  </div>
+
+  <script nonce="${nonce}">
+    var vscode;
+    try { vscode = acquireVsCodeApi(); } catch(e) { vscode = null; }
+
+    function loadState() {
+      if (!vscode) { return { viewport: 'desktop', theme: 'dark' }; }
+      return Object.assign({ viewport: 'desktop', theme: 'dark' }, vscode.getState() || {});
+    }
+    function saveState(patch) {
+      if (!vscode) { return; }
+      vscode.setState(Object.assign(loadState(), patch));
+    }
+
+    var frame = document.getElementById('glance-frame');
+    function setViewport(vp) {
+      frame.className = 'vp-' + vp;
+      ['mobile','tablet','desktop'].forEach(function(v) {
+        var btn = document.getElementById('vp-' + v);
+        btn.classList.toggle('active', v === vp);
+        btn.setAttribute('aria-pressed', String(v === vp));
+      });
+      saveState({ viewport: vp });
+    }
+
+    var canvas = document.getElementById('glance-canvas');
+    function setTheme(th) {
+      canvas.className = 'theme-' + th;
+      ['dark','light','none'].forEach(function(t) {
+        var btn = document.getElementById('th-' + t);
+        btn.classList.toggle('active', t === th);
+        btn.setAttribute('aria-pressed', String(t === th));
+      });
+      saveState({ theme: th });
+    }
+
+    (function() {
+      var s = loadState();
+      setViewport(s.viewport);
+      setTheme(s.theme);
+    })();
+
+    // Auto-size the iframe to its content height so the canvas scrolls naturally.
+    var iframe = document.getElementById('glance-iframe');
+    iframe.addEventListener('load', function() {
+      try {
+        var h = iframe.contentDocument.documentElement.scrollHeight;
+        iframe.style.height = h + 'px';
+      } catch(e) { /* cross-origin or sandboxed — leave min-height */ }
+    });
+
+    document.getElementById('glance-toolbar').addEventListener('keydown', function(e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') { return; }
+      var group = e.target.closest('.tb-group');
+      if (!group) { return; }
+      var btns = Array.prototype.slice.call(group.querySelectorAll('.tb-btn'));
+      var idx = btns.indexOf(e.target);
+      if (idx === -1) { return; }
+      var next = e.key === 'ArrowRight' ? (idx + 1) % btns.length : (idx - 1 + btns.length) % btns.length;
+      btns[next].focus();
+      e.preventDefault();
+    });
+  </script>
+</body>
+</html>`;
+}
+
+/**
  * The main preview document.
  *
  * Toolbar state (viewport, theme) is persisted via vscode.getState/setState

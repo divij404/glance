@@ -10,9 +10,9 @@ export async function openPreview(context: vscode.ExtensionContext): Promise<voi
   }
 
   const { languageId, uri } = editor.document;
-  if (languageId !== 'javascriptreact' && languageId !== 'typescriptreact') {
+  if (languageId !== 'javascriptreact' && languageId !== 'typescriptreact' && languageId !== 'html') {
     vscode.window.showWarningMessage(
-      'Glance: Preview is only available for .jsx and .tsx files.',
+      'Glance: Preview is only available for .jsx, .tsx, and .html files.',
     );
     return;
   }

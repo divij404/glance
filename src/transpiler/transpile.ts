@@ -17,6 +17,7 @@ export type GlanceProps = Record<string, string | number | boolean>;
 
 export type TranspileResult =
   | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; tailwindMode: 'none' | 'cdn' | 'cli'; glanceProps: GlanceProps; dependencies: vscode.Uri[] }
+  | { kind: 'html'; rawHtml: string }
   | { kind: 'error'; message: string; file: string; line: number; col: number };
 
 /**
@@ -48,8 +49,6 @@ async function getEsbuild() {
 
 export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
   try {
-    const esbuild = await getEsbuild();
-
     // Read the entry file — prefer the in-memory buffer so live mode reflects
     // unsaved edits. Fall back to disk if the file isn't open in an editor.
     const openDoc = vscode.workspace.textDocuments.find(
@@ -60,6 +59,13 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
       : Buffer.from(await vscode.workspace.fs.readFile(fileUri)).toString('utf8');
     const fileDir = path.dirname(fileUri.fsPath);
     const fileName = path.basename(fileUri.fsPath);
+
+    // ── HTML files: skip transpilation entirely, serve raw HTML ──────────────
+    if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+      return { kind: 'html', rawHtml: sourceText };
+    }
+
+    const esbuild = await getEsbuild();
 
     // Collect dependency URIs so the watcher can track them
     const collectedDeps: vscode.Uri[] = [];

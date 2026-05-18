@@ -2,7 +2,7 @@
   "name": "glance-preview",
   "displayName": "Glance - React Component Preview",
   "description": "Instant sandboxed preview for React (.jsx/.tsx) components. No dev server required.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "divij404",
   "engines": {
     "vscode": "^1.85.0"
@@ -27,7 +27,8 @@
   },
   "activationEvents": [
     "onLanguage:javascriptreact",
-    "onLanguage:typescriptreact"
+    "onLanguage:typescriptreact",
+    "onLanguage:html"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -53,14 +54,14 @@
         "command": "glance.openPreview",
         "key": "ctrl+alt+p",
         "mac": "cmd+alt+p",
-        "when": "editorLangId == javascriptreact || editorLangId == typescriptreact"
+        "when": "editorLangId == javascriptreact || editorLangId == typescriptreact || editorLangId == html"
       }
     ],
     "menus": {
       "editor/context": [
         {
           "command": "glance.openPreview",
-          "when": "editorLangId == javascriptreact || editorLangId == typescriptreact",
+          "when": "editorLangId == javascriptreact || editorLangId == typescriptreact || editorLangId == html",
           "group": "navigation"
         }
       ]

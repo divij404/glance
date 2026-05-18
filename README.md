@@ -1,92 +1,114 @@
-# Glance — React Component Preview
+# Glance
 
-**Instant sandboxed preview for React components. No dev server. No config. No build step.**
+Preview React components and HTML files instantly inside VS Code — no dev server, no browser, no setup.
 
-Press `Ctrl+Alt+P` on any `.jsx` or `.tsx` file and a live preview opens beside your editor.
+## What's in it for you
 
----
+Starting a dev server just to check one component takes too long. You wait for a build, open a browser, and navigate to the right page. Glance skips all of that.
 
-## Why
+- Open any `.jsx`, `.tsx`, or `.html` file and press one key. A preview appears beside your editor.
+- The preview updates every time you save. No browser tab to switch to.
+- Glance works with Create React App, Vite, and Next.js. You do not need to change your project.
+- Glance bundles everything it needs. You do not install React or esbuild separately.
 
-Spinning up a dev server, wiring a route, opening a browser tab — it's too much friction for just checking a component. Glance bundles your file in-memory with esbuild and renders it directly in VS Code. Zero setup.
+## Installation
 
----
+1. Open VS Code
+2. Press `Ctrl+Shift+X` to open the Extensions panel
+3. Search for **Glance**
+4. Click **Install**
 
-## Quick start
+That's it. Glance includes all its dependencies.
 
-1. Open a `.jsx` or `.tsx` file
-2. Press `Ctrl+Alt+P` (`Cmd+Alt+P` on Mac)
-3. Edit and save — preview updates instantly
+## Usage
 
----
+### Open a preview
 
-## `@glance` props
+1. Open a `.jsx`, `.tsx`, or `.html` file
+2. Press `Ctrl+Alt+P` (Mac: `Cmd+Alt+P`)
+3. A preview panel opens beside your editor
+4. Edit and save — the preview updates
 
-Seed your component with test props by adding a comment to the file:
+You can also right-click in the editor and choose **Glance: Open Preview**.
+
+### HTML files
+
+Open any `.html` or `.htm` file and press `Ctrl+Alt+P`. Glance renders it in a sandboxed frame. Your `<style>` and `<script>` tags work as normal. No build step runs.
+
+### Live props
+
+You can pass test props to a React component. Add a comment at the top of the file:
 
 ```tsx
 // @glance { label: "Click me", count: 0, disabled: false, color: "#61afef" }
 
 export default function Button({ label, count, disabled, color }) {
-  // ...
+  return <button disabled={disabled} style={{ color }}>{label} ({count})</button>;
 }
 ```
 
-Glance reads the comment and renders your component with those values. A props bar appears in the toolbar where you can edit strings, numbers, booleans, and colors live — no retranspile needed.
+Glance reads the comment and shows a props bar in the toolbar. You can edit each value live. The component updates without rebuilding.
 
----
+### Toolbar
 
-## Toolbar
+**Viewport** — sets the preview width. Choose Mobile (375px), Tablet (768px), or Desktop (full width).
 
-- **Viewport** — Mobile (375 px), Tablet (768 px), Desktop (1280 px)
-- **Background** — Light or dark sandbox canvas
-- **Props bar** — live controls for every `@glance` prop, persisted across reloads
+**Background** — sets the canvas color behind the component. Choose dark, light, or transparent.
 
----
+### Errors
 
-## Refresh modes
+If your file has a build error, Glance shows it at the bottom of the panel. The last working preview stays visible. When you fix the error and save, the preview returns.
 
-**Save** (default) — refreshes on `Ctrl+S`. Good for most work.
+### Refresh mode
 
-**Live** — refreshes on every keystroke with a 400 ms debounce. Good for layout and styling.
+By default, Glance updates when you save (`Ctrl+S`). You can switch to **live mode**, which updates as you type. Click **Glance: save** in the status bar to toggle.
 
-Toggle by clicking **Glance: save** / **Glance: live** in the status bar.
+> [!NOTE]
+> Live mode waits 400ms after your last keystroke before it rebuilds. You can change this delay in settings.
 
----
+## Configuration
 
-## CSS & Tailwind
-
-Plain CSS imports and CSS Modules work out of the box. For Tailwind, Glance detects your project automatically — if the CLI is installed it runs a build; otherwise it injects the CDN. No config needed either way.
-
----
-
-## Error handling
-
-Build errors and runtime exceptions appear as an overlay without blowing away the last good preview. A typo won't nuke your working render.
-
----
-
-## Settings
+Open VS Code Settings (`Ctrl+,`) and search for **Glance**.
 
 | Setting | Default | Description |
 |---|---|---|
-| `glance.refreshMode` | `"save"` | `"save"` or `"live"` |
-| `glance.liveDebounceMs` | `400` | Debounce delay for live mode (ms) |
-| `glance.defaultViewport` | `"desktop"` | `"mobile"`, `"tablet"`, or `"desktop"` |
-| `glance.defaultTheme` | `"dark"` | `"light"`, `"dark"`, or `"system"` |
+| `glance.refreshMode` | `"save"` | When to update: `"save"` or `"live"` |
+| `glance.liveDebounceMs` | `400` | Delay before live mode rebuilds (ms) |
+| `glance.defaultViewport` | `"desktop"` | Starting viewport: `"mobile"`, `"tablet"`, or `"desktop"` |
+| `glance.defaultTheme` | `"dark"` | Starting background: `"light"`, `"dark"`, or `"system"` |
 
----
-
-## Commands
+### Commands
 
 | Command | Keybinding | Description |
 |---|---|---|
-| Glance: Open Preview | `Ctrl+Alt+P` / `Cmd+Alt+P` | Open preview for the active file |
+| Glance: Open Preview | `Ctrl+Alt+P` / `Cmd+Alt+P` | Open the preview panel |
 | Glance: Close Preview | — | Close the preview panel |
-| Glance: Toggle Refresh Mode | Click status bar | Switch save ↔ live |
+| Glance: Toggle Refresh Mode | Click status bar | Switch between save and live mode |
 
----
+## Contributing
+
+Pull requests are welcome. The source is on [GitHub](https://github.com/divij404/glance).
+
+**Set up the dev environment:**
+
+```bash
+git clone https://github.com/divij404/glance.git
+cd glance
+npm install
+npm run build
+```
+
+Then press `F5` in VS Code. This opens a new VS Code window with Glance loaded. You can test your changes there.
+
+**Run the linter:**
+
+```bash
+npm run lint
+```
+
+> [!IMPORTANT]
+> Glance uses Node.js esbuild, not esbuild-wasm. You need Node.js 18 or later. VS Code includes Node.js 18 by default, so no separate install is needed in most cases.
 
 ## License
 
-MIT
+MIT License — see [LICENSE](LICENSE).
