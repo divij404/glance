@@ -1,14 +1,14 @@
 # Glance
 
-Preview React components and HTML files instantly inside VS Code — no dev server, no browser, no setup.
+Preview React, React Native, and HTML files instantly inside VS Code — no dev server, no browser, no setup.
 
 ## What's in it for you
 
 Starting a dev server just to check one component takes too long. You wait for a build, open a browser, and navigate to the right page. Glance skips all of that.
 
-- Open any `.jsx`, `.tsx`, or `.html` file and press one key. A preview appears beside your editor.
+- Open any `.jsx`, `.tsx`, `.html`, or React Native file and press one key. A preview appears beside your editor.
 - The preview updates every time you save. No browser tab to switch to.
-- Glance works with Create React App, Vite, and Next.js. You do not need to change your project.
+- Glance works with Create React App, Vite, Next.js, and React Native. You do not need to change your project.
 - Glance bundles everything it needs. You do not install React or esbuild separately.
 
 ## Installation
@@ -24,7 +24,7 @@ That's it. Glance includes all its dependencies.
 
 ### Open a preview
 
-1. Open a `.jsx`, `.tsx`, or `.html` file
+1. Open a `.jsx`, `.tsx`, `.html`, or React Native file
 2. Press `Ctrl+Alt+P` (Mac: `Cmd+Alt+P`)
 3. A preview panel opens beside your editor
 4. Edit and save — the preview updates
@@ -34,6 +34,10 @@ You can also right-click in the editor and choose **Glance: Open Preview**.
 ### HTML files
 
 Open any `.html` or `.htm` file and press `Ctrl+Alt+P`. Glance renders it in a sandboxed frame. Your `<style>` and `<script>` tags work as normal. No build step runs.
+
+### React Native files
+
+Open a `.jsx` or `.tsx` file that imports from `react-native` and press `Ctrl+Alt+P`. Glance automatically detects React Native imports and aliases them to `react-native-web`, so your components render directly in the panel without any configuration. Platform-specific extensions (`.web.tsx`, `.native.tsx`) are resolved automatically.
 
 ### Live props
 
