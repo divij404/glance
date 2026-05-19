@@ -23,15 +23,25 @@ export function makeImportResolverPlugin(
           args.path,
         );
 
-        // Try common extensions if no extension given
+        // Try common extensions if no extension given.
+        // .web.* variants are listed first so react-native-web's platform-specific
+        // files take priority over the bare RN versions when targeting web.
         const candidates = abs.includes('.')
           ? [abs]
           : [
               abs,
+              `${abs}.web.tsx`,
+              `${abs}.web.ts`,
+              `${abs}.web.jsx`,
+              `${abs}.web.js`,
               `${abs}.tsx`,
               `${abs}.ts`,
               `${abs}.jsx`,
               `${abs}.js`,
+              `${abs}/index.web.tsx`,
+              `${abs}/index.web.ts`,
+              `${abs}/index.web.jsx`,
+              `${abs}/index.web.js`,
               `${abs}/index.tsx`,
               `${abs}/index.ts`,
               `${abs}/index.jsx`,

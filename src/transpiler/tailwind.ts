@@ -18,7 +18,12 @@ export type TailwindMode =
 export async function detectAndBuildTailwind(
   fileDir: string,
   entryFile: string,
+  isReactNative = false,
 ): Promise<TailwindMode> {
+  // React Native components use StyleSheet.create(), not CSS class names.
+  // Tailwind is not applicable — skip detection entirely.
+  if (isReactNative) { return { kind: 'none' }; }
+
   const projectRoot = findProjectRoot(fileDir);
   if (!projectRoot) { return { kind: 'none' }; }
 

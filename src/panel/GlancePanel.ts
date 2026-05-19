@@ -220,4 +220,3 @@ export class GlancePanel {
     this._disposables.push(this._watcher);
   }
 }
-                                                                        

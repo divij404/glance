@@ -17,7 +17,7 @@ export type GlanceProps = Record<string, string | number | boolean>;
 
 export type TranspileResult =
   | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; tailwindMode: 'none' | 'cdn' | 'cli'; glanceProps: GlanceProps; dependencies: vscode.Uri[]; isReactNative: boolean }
-  | { kind: 'html'; htmlUri: vscode.Uri }
+  | { kind: 'html'; rawHtml: string }
   | { kind: 'error'; message: string; file: string; line: number; col: number };
 
 /**
@@ -60,16 +60,9 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     const fileDir = path.dirname(fileUri.fsPath);
     const fileName = path.basename(fileUri.fsPath);
 
-    // ── HTML files: write to temp file and return its URI ────────────────────
-    // Using a file URI (loaded via src=) rather than srcdoc avoids CSP inheritance
-    // issues and escaping problems with script tags inside the user's HTML.
+    // ── HTML files: pass raw HTML to the panel for srcdoc rendering ─────────
     if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-      if (!fs.existsSync(GLANCE_TMP_DIR)) {
-        fs.mkdirSync(GLANCE_TMP_DIR, { recursive: true });
-      }
-      const htmlPath = path.join(GLANCE_TMP_DIR, 'preview.html');
-      fs.writeFileSync(htmlPath, sourceText, 'utf8');
-      return { kind: 'html', htmlUri: vscode.Uri.file(htmlPath) };
+      return { kind: 'html', rawHtml: sourceText };
     }
 
     // ── React Native detection ────────────────────────────────────────────────
@@ -266,4 +259,7 @@ function isEsbuildError(e: unknown): e is { errors: Array<{ text: string; locati
   return (
     typeof e === 'object' &&
     e !== null &&
-    'errors' in 
+    'errors' in e &&
+    Array.isArray((e as { errors: unknown }).errors)
+  );
+}

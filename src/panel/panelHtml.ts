@@ -645,4 +645,11 @@ export function getPreviewHtml(
 
     document.querySelectorAll('[data-key]').forEach(function(el) {
       el.addEventListener('input', applyProps);
-      el.addEv
+      el.addEventListener('change', applyProps);
+    });
+  </script>
+
+  ${bundleScriptUri ? `<script nonce="${nonce}" src="${bundleScriptUri}?v=${bust}"></script>` : ''}
+</body>
+</html>`;
+}

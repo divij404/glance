@@ -13,7 +13,11 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "react-native": ["./node_modules/react-native-web/src/index"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "webview"]
