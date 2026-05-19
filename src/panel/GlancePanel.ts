@@ -149,19 +149,21 @@ export class GlancePanel {
       outputChannel.appendLine(`[Glance] transpile result: ${result.kind}`);
 
       if (result.kind === 'html') {
-        // Raw HTML file — embed directly in an iframe, no esbuild involved.
+        // HTML file — rendered via srcdoc so it runs in its own origin context,
+        // bypassing the webview's outer CSP and resource URI restrictions.
         this._panel.webview.html = getHtmlFilePreviewHtml(result.rawHtml);
-        outputChannel.appendLine('[Glance] HTML preview rendered');
+        outputChannel.appendLine('[Glance] HTML preview rendered (srcdoc)');
       } else if (result.kind === 'ok') {
         this._watcher?.setDependencies(result.dependencies);
         const scriptUri = this._panel.webview.asWebviewUri(result.bundleUri).toString();
         const isCdn = result.tailwindMode === 'cdn';
-        this._panel.webview.html = getPreviewHtml(scriptUri, undefined, result.cssText, isCdn, result.glanceProps);
+        this._panel.webview.html = getPreviewHtml(scriptUri, undefined, result.cssText, isCdn, result.glanceProps, result.isReactNative);
         this._lastGoodScriptUri = scriptUri;
         this._lastGoodCssText = result.cssText;
         this._lastGoodTailwindCdn = isCdn;
         this._lastGoodGlanceProps = result.glanceProps;
-        outputChannel.appendLine(`[Glance] preview updated (tailwind: ${result.tailwindMode})`);
+        this._lastGoodIsReactNative = result.isReactNative;
+        outputChannel.appendLine(`[Glance] preview updated (tailwind: ${result.tailwindMode}, rn: ${result.isReactNative})`);
       } else {
         outputChannel.appendLine(`[Glance] transpile error: ${result.message}`);
         const errorOverlay = {
@@ -171,7 +173,7 @@ export class GlancePanel {
           col: result.col,
         };
         if (this._lastGoodScriptUri) {
-          this._panel.webview.html = getPreviewHtml(this._lastGoodScriptUri, errorOverlay, this._lastGoodCssText, this._lastGoodTailwindCdn, this._lastGoodGlanceProps);
+          this._panel.webview.html = getPreviewHtml(this._lastGoodScriptUri, errorOverlay, this._lastGoodCssText, this._lastGoodTailwindCdn, this._lastGoodGlanceProps, this._lastGoodIsReactNative);
         } else {
           this._panel.webview.html = getPreviewHtml('', errorOverlay);
         }
@@ -185,6 +187,7 @@ export class GlancePanel {
   private _lastGoodCssText: string = '';
   private _lastGoodTailwindCdn: boolean = false;
   private _lastGoodGlanceProps: Record<string, string | number | boolean> = {};
+  private _lastGoodIsReactNative: boolean = false;
 
   private _startWatcher(): void {
     const settings = getSettings();
@@ -217,3 +220,4 @@ export class GlancePanel {
     this._disposables.push(this._watcher);
   }
 }
+                                                                        

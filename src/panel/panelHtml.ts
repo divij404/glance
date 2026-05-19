@@ -66,25 +66,22 @@ export function getFirstLoadErrorHtml(message: string, file: string, line: numbe
 /**
  * Preview for raw .html files.
  *
- * The user's HTML is embedded via <iframe srcdoc="..."> so its own <head>,
- * <style>, and <script> tags don't conflict with Glance's toolbar markup.
- * Viewport buttons resize the iframe width just like the React preview does
- * for #glance-frame. The theme background (canvas) is still user-controllable.
+ * The user's HTML is injected via srcdoc. A sandboxed srcdoc iframe gets its
+ * own opaque origin and a fresh CSP, so scripts inside the user's file run
+ * normally without being blocked by the outer webview's Content-Security-Policy.
+ * allow-same-origin is intentionally omitted to keep the iframe origin opaque.
  */
 export function getHtmlFilePreviewHtml(rawHtml: string): string {
   const nonce = getNonce();
-  // Escape the raw HTML for safe embedding inside a double-quoted srcdoc attribute.
-  // We only need to escape & and " — the browser reconstructs the full DOM from srcdoc.
-  const srcdoc = rawHtml
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;');
+  // srcdoc requires only `"` to be escaped inside a double-quoted attribute.
+  const srcdoc = rawHtml.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
   return /* html */ `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; frame-src 'self' data:;" />
+    content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -172,8 +169,8 @@ export function getHtmlFilePreviewHtml(rawHtml: string): string {
       display: block;
       width: 100%;
       border: none;
-      /* Height grows to fit content via ResizeObserver on the iframe's document */
-      min-height: 200px;
+      /* Starts at full viewport height; grows via postMessage from the injected reporter */
+      min-height: 100vh;
     }
   </style>
 </head>
@@ -204,7 +201,7 @@ export function getHtmlFilePreviewHtml(rawHtml: string): string {
       <iframe
         id="glance-iframe"
         srcdoc="${srcdoc}"
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        sandbox="allow-scripts allow-forms allow-modals allow-popups"
         title="HTML preview"
       ></iframe>
     </div>
@@ -251,15 +248,6 @@ export function getHtmlFilePreviewHtml(rawHtml: string): string {
       setTheme(s.theme);
     })();
 
-    // Auto-size the iframe to its content height so the canvas scrolls naturally.
-    var iframe = document.getElementById('glance-iframe');
-    iframe.addEventListener('load', function() {
-      try {
-        var h = iframe.contentDocument.documentElement.scrollHeight;
-        iframe.style.height = h + 'px';
-      } catch(e) { /* cross-origin or sandboxed — leave min-height */ }
-    });
-
     document.getElementById('glance-toolbar').addEventListener('keydown', function(e) {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') { return; }
       var group = e.target.closest('.tb-group');
@@ -295,6 +283,7 @@ export function getPreviewHtml(
   cssText?: string,
   tailwindCdn?: boolean,
   glanceProps?: Record<string, string | number | boolean>,
+  isReactNative?: boolean,
 ): string {
   const bust = Date.now();
   const nonce = getNonce();
@@ -404,6 +393,7 @@ export function getPreviewHtml(
     .tb-btn.tb-icon { font-size: 14px; min-width: 30px; padding: 2px 6px; }
     .tb-btn:focus-visible { outline: 2px solid #61afef; outline-offset: 1px; border-radius: 2px; }
     .tb-label { color: #555; font-size: 10px; padding: 0 6px 0 2px; letter-spacing: 0.04em; text-transform: uppercase; }
+    .tb-badge { color: #888; font-size: 10px; margin-left: auto; padding-right: 4px; letter-spacing: 0.04em; text-transform: uppercase; }
 
     /* ── Props row (second toolbar bar) ── */
     #glance-props-bar {
@@ -508,6 +498,12 @@ export function getPreviewHtml(
     #glance-error.expanded .err-detail { display: block; }
     #glance-error .err-msg { color: #ddd; font-family: monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
   </style>
+  ${isReactNative ? `<style>
+    /* React Native Web root reset — mirrors RN's default flex-column layout.
+       Width:100% ensures the root View fills the container (RNW uses flex by default).
+       min-height fills the visible area below the toolbar without overriding body padding. */
+    #root { display: flex; flex-direction: column; width: 100%; min-height: calc(100vh - ${propsRow ? '66px' : '36px'}); }
+  </style>` : ''}
   ${cssText ? `<style>${cssText}</style>` : ''}
 </head>
 <body>
@@ -529,6 +525,7 @@ export function getPreviewHtml(
       <button class="tb-btn" id="th-light" onclick="setTheme('light')" aria-label="Light background"       aria-pressed="false">light</button>
       <button class="tb-btn" id="th-none"  onclick="setTheme('none')"  aria-label="Transparent background" aria-pressed="false">none</button>
     </div>
+    ${isReactNative ? `<span class="tb-badge">RN</span>` : ''}
   </div>
   ${propsRow}
 
@@ -648,11 +645,4 @@ export function getPreviewHtml(
 
     document.querySelectorAll('[data-key]').forEach(function(el) {
       el.addEventListener('input', applyProps);
-      el.addEventListener('change', applyProps);
-    });
-  </script>
-
-  ${bundleScriptUri ? `<script nonce="${nonce}" src="${bundleScriptUri}?v=${bust}"></script>` : ''}
-</body>
-</html>`;
-}
+      el.addEv

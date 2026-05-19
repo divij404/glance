@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { esmShimPlugin } from './esmShim';
+import { makeEsmShimPlugin } from './esmShim';
 import { makeImportResolverPlugin } from './importResolver';
 import { detectAndBuildTailwind } from './tailwind';
 
@@ -16,8 +16,8 @@ const GLANCE_TMP_DIR = path.join(os.tmpdir(), 'glance-preview');
 export type GlanceProps = Record<string, string | number | boolean>;
 
 export type TranspileResult =
-  | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; tailwindMode: 'none' | 'cdn' | 'cli'; glanceProps: GlanceProps; dependencies: vscode.Uri[] }
-  | { kind: 'html'; rawHtml: string }
+  | { kind: 'ok'; bundleUri: vscode.Uri; bundlePath: string; cssText: string; tailwindMode: 'none' | 'cdn' | 'cli'; glanceProps: GlanceProps; dependencies: vscode.Uri[]; isReactNative: boolean }
+  | { kind: 'html'; htmlUri: vscode.Uri }
   | { kind: 'error'; message: string; file: string; line: number; col: number };
 
 /**
@@ -60,10 +60,22 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     const fileDir = path.dirname(fileUri.fsPath);
     const fileName = path.basename(fileUri.fsPath);
 
-    // ── HTML files: skip transpilation entirely, serve raw HTML ──────────────
+    // ── HTML files: write to temp file and return its URI ────────────────────
+    // Using a file URI (loaded via src=) rather than srcdoc avoids CSP inheritance
+    // issues and escaping problems with script tags inside the user's HTML.
     if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-      return { kind: 'html', rawHtml: sourceText };
+      if (!fs.existsSync(GLANCE_TMP_DIR)) {
+        fs.mkdirSync(GLANCE_TMP_DIR, { recursive: true });
+      }
+      const htmlPath = path.join(GLANCE_TMP_DIR, 'preview.html');
+      fs.writeFileSync(htmlPath, sourceText, 'utf8');
+      return { kind: 'html', htmlUri: vscode.Uri.file(htmlPath) };
     }
+
+    // ── React Native detection ────────────────────────────────────────────────
+    // If the file imports from 'react-native', alias it to react-native-web so
+    // RN components render to the DOM without any changes to the user's code.
+    const isReactNative = /from\s+['"]react-native['"]|require\s*\(\s*['"]react-native['"]\s*\)/.test(sourceText);
 
     const esbuild = await getEsbuild();
 
@@ -95,9 +107,11 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
       jsx: 'automatic',
       write: false,
       outdir: GLANCE_TMP_DIR,
+      // Alias react-native → react-native-web for RN components so they render to DOM
+      alias: isReactNative ? { 'react-native': 'react-native-web' } : {},
       plugins: [
         makeImportResolverPlugin(fileDir, collectedDeps),
-        esmShimPlugin,
+        makeEsmShimPlugin(isReactNative ? { 'react-native': 'react-native-web' } : {}),
       ],
       external: [],
       logLevel: 'silent',
@@ -140,6 +154,38 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     // live by calling window.__glance_render__(newProps) without re-transpiling.
     const mountHarness = `
 ;(function() {
+  function showError(msg, stack) {
+    var el = document.getElementById("root");
+    if (!el) { el = document.body; }
+    el.innerHTML =
+      "<div style=\\"padding:20px;font-family:'Segoe UI',system-ui,sans-serif;\\">" +
+      "<div style=\\"color:#e06c75;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;\\">Runtime Error</div>" +
+      "<div style=\\"color:#ddd;font-family:monospace;font-size:13px;white-space:pre-wrap;line-height:1.5;\\">" + msg + (stack ? "\\n\\n" + stack : "") + "</div>" +
+      "</div>";
+  }
+
+  // React 18 does NOT propagate render errors to the createRoot().render() caller.
+  // We intercept console.error to catch React's "The above error occurred..." message.
+  var _origError = console.error.bind(console);
+  var _renderErrorShown = false;
+  console.error = function() {
+    _origError.apply(console, arguments);
+    if (_renderErrorShown) { return; }
+    var msg = Array.prototype.join.call(arguments, ' ');
+    // React logs uncaught render errors with this prefix
+    if (msg.indexOf('The above error occurred') !== -1 || msg.indexOf('Uncaught Error') !== -1) {
+      _renderErrorShown = true;
+      showError(msg, '');
+    }
+  };
+
+  // Also catch unhandled errors (covers synchronous throws outside React tree)
+  window.addEventListener('error', function(e) {
+    if (_renderErrorShown) { return; }
+    _renderErrorShown = true;
+    showError(e.message || String(e), e.error && e.error.stack ? e.error.stack.split("\\n").slice(1,4).join("\\n") : '');
+  });
+
   try {
     var mod = window.__glance_module__;
     var Component = mod && mod.default;
@@ -164,12 +210,8 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     _render(_props);
   } catch (err) {
     var msg = err && err.message ? err.message : String(err);
-    var stack = err && err.stack ? "\\n\\n" + err.stack.split("\\n").slice(1, 4).join("\\n") : "";
-    document.body.innerHTML =
-      "<div style=\\"padding:20px;font-family:'Segoe UI',system-ui,sans-serif;\\">" +
-      "<div style=\\"color:#e06c75;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;\\">Runtime Error</div>" +
-      "<div style=\\"color:#ddd;font-family:monospace;font-size:13px;white-space:pre-wrap;line-height:1.5;\\">" + msg + stack + "</div>" +
-      "</div>";
+    var stack = err && err.stack ? err.stack.split("\\n").slice(1, 4).join("\\n") : "";
+    showError(msg, stack);
   }
 })();
 `;
@@ -181,8 +223,9 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     fs.writeFileSync(bundlePath, userCode + mountHarness, 'utf8');
     const bundleUri = vscode.Uri.file(bundlePath);
 
-    // Detect and build Tailwind CSS if the user's project uses it
-    const twResult = await detectAndBuildTailwind(fileDir, fileUri.fsPath);
+    // Detect and build Tailwind CSS if the user's project uses it.
+    // RN files use StyleSheet.create() — Tailwind is not applicable.
+    const twResult = await detectAndBuildTailwind(fileDir, fileUri.fsPath, isReactNative);
     const tailwindCss = twResult.kind === 'cli' ? twResult.cssText : '';
     const combinedCss = [tailwindCss, cssText].filter(Boolean).join('\n');
 
@@ -194,6 +237,7 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
       tailwindMode: twResult.kind,
       glanceProps,
       dependencies: collectedDeps,
+      isReactNative,
     };
 
   } catch (e: unknown) {
@@ -222,7 +266,4 @@ function isEsbuildError(e: unknown): e is { errors: Array<{ text: string; locati
   return (
     typeof e === 'object' &&
     e !== null &&
-    'errors' in e &&
-    Array.isArray((e as { errors: unknown }).errors)
-  );
-}
+    'errors' in 
