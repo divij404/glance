@@ -19,7 +19,8 @@ const extensionOpts = {
   platform: 'node',
   target: 'node18',
   // vscode is provided by VS Code at runtime.
-  // esbuild is a native Node addon — must NOT be bundled.
+  // esbuild must be external so Node resolves its native binary from node_modules
+  // at runtime — bundling it would break the binary path resolution.
   external: ['vscode', 'esbuild'],
 };
 

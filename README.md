@@ -111,7 +111,7 @@ npm run lint
 ```
 
 > [!IMPORTANT]
-> Glance uses Node.js esbuild, not esbuild-wasm. You need Node.js 18 or later. VS Code includes Node.js 18 by default, so no separate install is needed in most cases.
+> You need Node.js 18 or later. VS Code includes Node.js 18 by default, so no separate install is needed in most cases.
 
 ## License
 

@@ -2,6 +2,10 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+// Use native esbuild — the extension host is Node, so the native binary works
+// directly with no wasm, no worker, no polyfills needed. esbuild is already a
+// devDependency and its binary ships inside the .vsix via node_modules/esbuild.
+import * as esbuildWasm from 'esbuild';
 import { makeEsmShimPlugin } from './esmShim';
 import { makeImportResolverPlugin } from './importResolver';
 import { detectAndBuildTailwind } from './tailwind';
@@ -38,12 +42,7 @@ export function parseGlanceProps(source: string): GlanceProps {
   return {};
 }
 
-// ── esbuild (native Node build) ───────────────────────────────────────────
-// We use the native esbuild package in the extension host (Node.js).
-// esbuild-wasm is only needed for browser contexts — not applicable here.
-async function getEsbuild() {
-  return await import('esbuild');
-}
+// Native esbuild needs no initialization — it spawns its binary on first use.
 
 // ── Main export ───────────────────────────────────────────────────────────
 
@@ -70,7 +69,7 @@ export async function transpile(fileUri: vscode.Uri): Promise<TranspileResult> {
     // RN components render to the DOM without any changes to the user's code.
     const isReactNative = /from\s+['"]react-native['"]|require\s*\(\s*['"]react-native['"]\s*\)/.test(sourceText);
 
-    const esbuild = await getEsbuild();
+    const esbuild = esbuildWasm;
 
     // Collect dependency URIs so the watcher can track them
     const collectedDeps: vscode.Uri[] = [];

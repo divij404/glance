@@ -1,11 +1,19 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+releases/
 *.vsix
-.DS_Store
-*.log
-docs/
-.vscode/
+
+# Dev / testing
 testing/
+docs/
 tailwind.config.js
 pnpm-lock.yaml
 pnpm-workspace.yaml
+
+# Editor / OS
+.vscode/
+.DS_Store
+*.log
