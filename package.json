@@ -2,7 +2,7 @@
   "name": "glance-preview",
   "displayName": "Glance - React Component Preview",
   "description": "Instant sandboxed preview for React (.jsx/.tsx) components. No dev server required.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "divij404",
   "engines": {
     "vscode": "^1.85.0"
